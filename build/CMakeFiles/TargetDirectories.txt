@@ -1,0 +1,10 @@
+C:/Users/TwiF5/Downloads/net-lab-2022-master/build/CMakeFiles/main.dir
+C:/Users/TwiF5/Downloads/net-lab-2022-master/build/CMakeFiles/eth_in.dir
+C:/Users/TwiF5/Downloads/net-lab-2022-master/build/CMakeFiles/eth_out.dir
+C:/Users/TwiF5/Downloads/net-lab-2022-master/build/CMakeFiles/arp_test.dir
+C:/Users/TwiF5/Downloads/net-lab-2022-master/build/CMakeFiles/ip_test.dir
+C:/Users/TwiF5/Downloads/net-lab-2022-master/build/CMakeFiles/ip_frag_test.dir
+C:/Users/TwiF5/Downloads/net-lab-2022-master/build/CMakeFiles/icmp_test.dir
+C:/Users/TwiF5/Downloads/net-lab-2022-master/build/CMakeFiles/test.dir
+C:/Users/TwiF5/Downloads/net-lab-2022-master/build/CMakeFiles/edit_cache.dir
+C:/Users/TwiF5/Downloads/net-lab-2022-master/build/CMakeFiles/rebuild_cache.dir
