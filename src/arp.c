@@ -59,6 +59,15 @@ void arp_print()
 void arp_req(uint8_t *target_ip)
 {
     // TO-DO
+    buf_init(&txbuf, sizeof(arp_pkt_t));
+    arp_pkt_t *data = (arp_pkt_t *)txbuf.data;  // 下层自动 padding
+    
+    *data = arp_init_pkt;   // 可用等号赋值结构体
+
+    data->opcode16 = swap16(ARP_REQUEST);
+    memcpy(data->target_ip, target_ip, NET_IP_LEN);
+
+    ethernet_out(&txbuf, ether_broadcast_mac, NET_PROTOCOL_ARP);
 }
 
 /**
@@ -70,6 +79,16 @@ void arp_req(uint8_t *target_ip)
 void arp_resp(uint8_t *target_ip, uint8_t *target_mac)
 {
     // TO-DO
+    buf_init(&txbuf, sizeof(arp_pkt_t));
+    arp_pkt_t *data = (arp_pkt_t *)txbuf.data;
+    
+    *data = arp_init_pkt;
+
+    data->opcode16 = swap16(ARP_REPLY);
+    memcpy(data->target_ip, target_ip, NET_IP_LEN);
+    memcpy(data->target_mac, target_mac, NET_MAC_LEN);
+
+    ethernet_out(&txbuf, target_mac, NET_PROTOCOL_ARP);
 }
 
 /**
@@ -81,6 +100,31 @@ void arp_resp(uint8_t *target_ip, uint8_t *target_mac)
 void arp_in(buf_t *buf, uint8_t *src_mac)
 {
     // TO-DO
+    if (buf->len < 8) {
+        return;
+    }
+
+    arp_pkt_t *data = (arp_pkt_t *)buf->data;
+    if (data->hw_type16  !=  arp_init_pkt.hw_type16  ||
+        data->pro_type16 !=  arp_init_pkt.pro_type16 ||
+        data->hw_len     !=  arp_init_pkt.hw_len     ||
+        data->pro_len    !=  arp_init_pkt.pro_len    ||
+        (data->opcode16  !=  swap16(ARP_REQUEST)     && data->opcode16 != swap16(ARP_REPLY))) {
+        // ？
+        return;
+    }
+
+    // src_mac 和 arp->sender_mac 一样
+    map_set(&arp_table, data->sender_ip, src_mac);
+
+    buf_t *bf;
+    if ((bf = map_get(&arp_buf, data->sender_ip))) {
+        ethernet_out(bf, src_mac, NET_PROTOCOL_IP);
+        map_delete(&arp_buf, data->sender_ip);
+
+    } else if (data->opcode16 == swap16(ARP_REQUEST) && memcmp(data->target_ip, net_if_ip, NET_IP_LEN) == 0) {
+        arp_resp(data->sender_ip, src_mac);
+    }
 }
 
 /**
@@ -93,6 +137,14 @@ void arp_in(buf_t *buf, uint8_t *src_mac)
 void arp_out(buf_t *buf, uint8_t *ip)
 {
     // TO-DO
+    uint8_t *mac;
+    if ((mac = map_get(&arp_table, ip))) {
+        ethernet_out(buf, mac, NET_PROTOCOL_IP);
+
+    } else if (!map_get(&arp_buf, ip)) {
+        map_set(&arp_buf, ip, buf);
+        arp_req(ip);
+    }
 }
 
 /**
