@@ -62,12 +62,12 @@ void arp_req(uint8_t *target_ip)
     buf_init(&txbuf, sizeof(arp_pkt_t));
     arp_pkt_t *data = (arp_pkt_t *)txbuf.data;  // 下层自动 padding
     
-    *data = arp_init_pkt;   // 可用等号赋值结构体
+    *data = arp_init_pkt;  // 可用等号赋值结构体
 
     data->opcode16 = swap16(ARP_REQUEST);
-    memcpy(data->target_ip, target_ip, NET_IP_LEN);
+    memcpy(data->target_ip, target_ip, NET_IP_LEN);  // Arp Announcement, mac = 0.0.0.0.0.0
 
-    ethernet_out(&txbuf, ether_broadcast_mac, NET_PROTOCOL_ARP);
+    ethernet_out(&txbuf, ether_broadcast_mac, NET_PROTOCOL_ARP);  // 广播，协议 Arp
 }
 
 /**
@@ -88,7 +88,7 @@ void arp_resp(uint8_t *target_ip, uint8_t *target_mac)
     memcpy(data->target_ip, target_ip, NET_IP_LEN);
     memcpy(data->target_mac, target_mac, NET_MAC_LEN);
 
-    ethernet_out(&txbuf, target_mac, NET_PROTOCOL_ARP);
+    ethernet_out(&txbuf, target_mac, NET_PROTOCOL_ARP);  // 单播，发送给特定 mac 地址
 }
 
 /**
@@ -100,7 +100,8 @@ void arp_resp(uint8_t *target_ip, uint8_t *target_mac)
 void arp_in(buf_t *buf, uint8_t *src_mac)
 {
     // TO-DO
-    if (buf->len < 8) {
+    // TODO: (?) Arp 协议独立，所以这里只会收到的 请求 或 响应 包
+    if (buf->len < 8) {  // 2 2 1 1 2，报头不完整 => 丢弃
         return;
     }
 
@@ -110,20 +111,19 @@ void arp_in(buf_t *buf, uint8_t *src_mac)
         data->hw_len     !=  arp_init_pkt.hw_len     ||
         data->pro_len    !=  arp_init_pkt.pro_len    ||
         (data->opcode16  !=  swap16(ARP_REQUEST)     && data->opcode16 != swap16(ARP_REPLY))) {
-        // ？
         return;
     }
 
-    // src_mac 和 arp->sender_mac 一样
-    map_set(&arp_table, data->sender_ip, src_mac);
+    map_set(&arp_table, data->sender_ip, src_mac);  // src_mac 和 arp->sender_mac 一样
 
+    // TODO: (?) 若判断顺序颠倒，会怎么样？
     buf_t *bf;
-    if ((bf = map_get(&arp_buf, data->sender_ip))) {
+    if ((bf = map_get(&arp_buf, data->sender_ip))) {  // 收到 arp 响应后 => 若此 ip 下有缓存未发的包，发之
         ethernet_out(bf, src_mac, NET_PROTOCOL_IP);
         map_delete(&arp_buf, data->sender_ip);
 
     } else if (data->opcode16 == swap16(ARP_REQUEST) && memcmp(data->target_ip, net_if_ip, NET_IP_LEN) == 0) {
-        arp_resp(data->sender_ip, src_mac);
+        arp_resp(data->sender_ip, src_mac);  // 收到对本 ip 的 arp 请求后 => 发 arp 响应
     }
 }
 
@@ -139,10 +139,10 @@ void arp_out(buf_t *buf, uint8_t *ip)
     // TO-DO
     uint8_t *mac;
     if ((mac = map_get(&arp_table, ip))) {
-        ethernet_out(buf, mac, NET_PROTOCOL_IP);
+        ethernet_out(buf, mac, NET_PROTOCOL_IP);  // 已有 mac 地址 => 直接发出，本协议栈只考虑 IP
 
     } else if (!map_get(&arp_buf, ip)) {
-        map_set(&arp_buf, ip, buf);
+        map_set(&arp_buf, ip, buf);  // 没 mac，还没等待响应 => 询问
         arp_req(ip);
     }
 }
