@@ -100,7 +100,7 @@ void arp_resp(uint8_t *target_ip, uint8_t *target_mac)
 void arp_in(buf_t *buf, uint8_t *src_mac)
 {
     // TO-DO
-    // TODO: (?) Arp 协议独立，所以这里只会收到的 请求 或 响应 包
+    // net_in() 函数根据 eth 包头的协议分流，这里只会收 ARP 协议下的 请求 或 响应 包
     if (buf->len < 8) {  // 2 2 1 1 2，报头不完整 => 丢弃
         return;
     }
@@ -116,7 +116,6 @@ void arp_in(buf_t *buf, uint8_t *src_mac)
 
     map_set(&arp_table, data->sender_ip, src_mac);  // src_mac 和 arp->sender_mac 一样
 
-    // TODO: (?) 若判断顺序颠倒，会怎么样？
     buf_t *bf;
     if ((bf = map_get(&arp_buf, data->sender_ip))) {  // 收到 arp 响应后 => 若此 ip 下有缓存未发的包，发之
         ethernet_out(bf, src_mac, NET_PROTOCOL_IP);
@@ -142,7 +141,7 @@ void arp_out(buf_t *buf, uint8_t *ip)
         ethernet_out(buf, mac, NET_PROTOCOL_IP);  // 已有 mac 地址 => 直接发出，本协议栈只考虑 IP
 
     } else if (!map_get(&arp_buf, ip)) {
-        map_set(&arp_buf, ip, buf);  // 没 mac，还没等待响应 => 询问
+        map_set(&arp_buf, ip, buf);  // 没 mac，还没等待响应 => 缓存并询问
         arp_req(ip);
     }
 }

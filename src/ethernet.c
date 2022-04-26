@@ -11,7 +11,7 @@
 void ethernet_in(buf_t *buf)
 {
     // TO-DO
-    // TODO: (?) 以太网头部大小 6 + 6 + 2，但是为什么不是小于 46 就不要呢？
+    // 以太网头部大小 6 + 6 + 2 为指导书要求，现实的协议栈可能有变化
     if (buf->len < 14) {
         return;
     }
@@ -44,7 +44,7 @@ void ethernet_out(buf_t *buf, const uint8_t *mac, net_protocol_t protocol)
     memcpy(hdr->dst, mac, NET_MAC_LEN);
     memcpy(hdr->src, net_if_mac, NET_MAC_LEN);
 
-    hdr->protocol16 = swap16(protocol);  // protocol 是 short 16 位，交换大小端
+    hdr->protocol16 = swap16(protocol);  // protocol 是 short 16 位，小端变大端
 
     driver_send(buf);
 }
