@@ -5,6 +5,11 @@
         "utils.h": "c",
         "net.h": "c",
         "string.h": "c",
-        "config.h": "c"
+        "config.h": "c",
+        "icmp.h": "c",
+        "ip.h": "c",
+        "udp.h": "c",
+        "ethernet.h": "c",
+        "driver.h": "c"
     }
 }
