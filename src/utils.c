@@ -77,14 +77,14 @@ uint16_t checksum16(uint16_t *data, size_t len)
     // TO-DO
     uint32_t sum = 0;
     while (len > 1) {
-        sum += *data++;         // *data, data++
+        sum += *data++;             // sum += *data; data++;
         len -= sizeof(uint16_t);
     }
 
     if (len)
         sum += *(uint8_t *)data;
 
-    while (sum & 0xffff0000)
+    while (sum >> 16)
         sum = (sum >> 16) + (sum & 0xffff);
 
     return (uint16_t)(~sum);

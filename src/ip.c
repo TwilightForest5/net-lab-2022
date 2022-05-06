@@ -13,17 +13,18 @@
 void ip_in(buf_t *buf, uint8_t *src_mac)
 {
     // TO-DO
-    if (buf->len < 20)                                  // 至少大于最小头部长 20
+    if (buf->len < 20)                                      // 包 > 最小头部长 20
         return;
     
     ip_hdr_t *hdr = (ip_hdr_t *)buf->data;
 
-    if ((hdr->tos & 0x1) != 0 ||                        // TOS 保留位 0
-        hdr->version != IP_VERSION_4 ||                 // IPv4
-        swap16(hdr->total_len16) <= buf->len)           // 总长度 <= 包长度
+    if ((hdr->tos & 0x1) != 0 ||                            // TOS 保留位 = 0
+        hdr->version != IP_VERSION_4 ||                     // IP 版本    = 4
+        swap16(hdr->total_len16) <= buf->len ||             // 总长度     <= 包长度
+        swap16(hdr->hdr_len) * IP_HDR_LEN_PER_BYTE >= 20)   // 头部长     >= 最小头部长
         return;
 
-    uint16_t check_sum16 = hdr->hdr_checksum16;         // 校验和计算不依赖大小端结果，转换与否无所谓
+    uint16_t check_sum16 = hdr->hdr_checksum16;             // 校验和计算不依赖大小端结果，无需 swap16()
     hdr->hdr_checksum16 = 0;
     if (check_sum16 ^ checksum16((uint16_t *)hdr, hdr->hdr_len * IP_HDR_LEN_PER_BYTE))
         return;
@@ -34,13 +35,12 @@ void ip_in(buf_t *buf, uint8_t *src_mac)
     if (swap16(hdr->total_len16) < buf->len)
         buf_remove_padding(buf, buf->len - swap16(hdr->total_len16));
 
-    uint16_t protocol = hdr->protocol;
     buf_remove_header(buf, sizeof(ip_hdr_t));
 
-    if (protocol != NET_PROTOCOL_ICMP && protocol != NET_PROTOCOL_UDP)        
+    if (hdr->protocol != NET_PROTOCOL_ICMP && hdr->protocol != NET_PROTOCOL_UDP)        
         icmp_unreachable(buf, hdr->src_ip, ICMP_CODE_PORT_UNREACH);
 
-    net_in(buf, protocol, src_mac);
+    net_in(buf, hdr->protocol, src_mac);
 }
 
 /**
@@ -62,12 +62,13 @@ void ip_fragment_out(buf_t *buf, uint8_t *ip, net_protocol_t protocol, int id, u
     hdr->version          = IP_VERSION_4;
     hdr->hdr_len          = sizeof(ip_hdr_t) / IP_HDR_LEN_PER_BYTE;
     hdr->tos              = 0;
-    hdr->ttl              = IP_DEFALUT_TTL;
-    hdr->protocol         = protocol;
 
     hdr->total_len16      = swap16(buf->len);
     hdr->id16             = swap16(id);
     hdr->flags_fragment16 = swap16((mf ? IP_MORE_FRAGMENT : 0) | offset);
+
+    hdr->ttl              = IP_DEFALUT_TTL;
+    hdr->protocol         = protocol;
 
     memcpy(hdr->src_ip, net_if_ip, NET_IP_LEN * sizeof(uint8_t));
     memcpy(hdr->dst_ip, ip,        NET_IP_LEN * sizeof(uint8_t));
@@ -88,16 +89,16 @@ void ip_fragment_out(buf_t *buf, uint8_t *ip, net_protocol_t protocol, int id, u
 void ip_out(buf_t *buf, uint8_t *ip, net_protocol_t protocol)
 {
     // TO-DO
-    static int  id = 0;
     const static size_t MAX_LEN =  ETHERNET_MAX_TRANSPORT_UNIT - sizeof(ip_hdr_t);
 
+    static int  id = 0;
     int         mf = 1;
-    uint16_t    offset = 0;
     size_t      len = MAX_LEN;
+    uint16_t    offset = 0;
     
     while (buf->len > 0) {
-        if (buf->len <= MAX_LEN) {      // 小于IP协议最大负载包长
-            mf = 0;                     // MF = 0
+        if (buf->len <= MAX_LEN) {      // 小于 IP 协议最大负载包长时，为最后分片
+            mf = 0;                     // MF   = 0
             len = buf->len;             // 包长 = 实际长度
         }
         
