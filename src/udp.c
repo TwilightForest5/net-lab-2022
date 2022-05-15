@@ -27,17 +27,26 @@ static uint16_t udp_checksum(buf_t *buf, uint8_t *src_ip, uint8_t *dst_ip)
     memcpy(udpeso_hdr->src_ip, src_ip, sizeof(uint8_t) * NET_IP_LEN);
     memcpy(udpeso_hdr->dst_ip, dst_ip, sizeof(uint8_t) * NET_IP_LEN);
     udpeso_hdr->placeholder = 0;
-    udpeso_hdr->protocol = ip_hdr.protocol;
+    // bug: according to the guider, this protocol came from ip_hdr.
+    //      However, this protocol would be wrong since the uninitalized txbuf or rxbuf.
+    //      Now this fixed by constant NET_PROTOCOL_UDP protocol
+    udpeso_hdr->protocol = NET_PROTOCOL_UDP;
     udpeso_hdr->total_len16 = swap16(buf->len - sizeof(udp_peso_hdr_t));
 
-    if (buf->len & 0x1)
+    uint8_t flag = 0;
+    if (buf->len & 0x1) {
         buf_add_padding(buf, 1);
+        flag = 1;
+    }
 
     uint16_t check_sum16 = checksum16((uint16_t *)buf->data, buf->len);
 
+    if (flag)   // bug: forget to remove padding. Now added.
+        buf_remove_padding(buf, 1);
     buf_remove_header(buf, sizeof(udp_peso_hdr_t));
     
-    memcpy(buf->data + sizeof(ip_hdr_t), &ip_hdr, sizeof(ip_hdr_t));
+    // bug: wrong calculate of ip header. Now fixed
+    memcpy(buf->data - sizeof(ip_hdr_t), &ip_hdr, sizeof(ip_hdr_t));
 
     return (uint16_t)check_sum16;
 }
@@ -60,15 +69,17 @@ void udp_in(buf_t *buf, uint8_t *src_ip)
     if (udp_check_sum ^ udp_checksum(buf, src_ip, net_if_ip))
         return;
 
-    udp_handler_t func;
+    udp_handler_t *func;
     uint16_t dst_port = swap16(hdr->dst_port16);
-    if (!(func = (udp_handler_t)map_get(&udp_table, &dst_port))) {
+    if ((func = (udp_handler_t *)map_get(&udp_table, &dst_port)) == NULL) {
         buf_add_header(buf, sizeof(ip_hdr_t));
         icmp_unreachable(buf, src_ip, ICMP_CODE_PORT_UNREACH);
     }
 
     buf_remove_header(buf, sizeof(udp_hdr_t));
-    func((uint8_t *)buf, buf->len, src_ip, swap16(hdr->src_port16));
+    // bug: Segmentation Fault, res: map_get() return addr of data, not data
+    // bug: buf in. Function need buf->data to print.
+    (*func)((uint8_t *)buf->data, buf->len, src_ip, swap16(hdr->src_port16));
 }
 
 /**
