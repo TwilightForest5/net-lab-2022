@@ -27,9 +27,6 @@ static uint16_t udp_checksum(buf_t *buf, uint8_t *src_ip, uint8_t *dst_ip)
     memcpy(udpeso_hdr->src_ip, src_ip, sizeof(uint8_t) * NET_IP_LEN);
     memcpy(udpeso_hdr->dst_ip, dst_ip, sizeof(uint8_t) * NET_IP_LEN);
     udpeso_hdr->placeholder = 0;
-    // bug: according to the guider, this protocol came from ip_hdr.
-    //      However, this protocol would be wrong since the uninitalized txbuf or rxbuf.
-    //      Now this fixed by constant NET_PROTOCOL_UDP protocol
     udpeso_hdr->protocol = NET_PROTOCOL_UDP;
     udpeso_hdr->total_len16 = swap16(buf->len - sizeof(udp_peso_hdr_t));
 
@@ -41,11 +38,10 @@ static uint16_t udp_checksum(buf_t *buf, uint8_t *src_ip, uint8_t *dst_ip)
 
     uint16_t check_sum16 = checksum16((uint16_t *)buf->data, buf->len);
 
-    if (flag)   // bug: forget to remove padding. Now added.
+    if (flag)
         buf_remove_padding(buf, 1);
     buf_remove_header(buf, sizeof(udp_peso_hdr_t));
     
-    // bug: wrong calculate of ip header. Now fixed
     memcpy(buf->data - sizeof(ip_hdr_t), &ip_hdr, sizeof(ip_hdr_t));
 
     return (uint16_t)check_sum16;
@@ -77,8 +73,6 @@ void udp_in(buf_t *buf, uint8_t *src_ip)
     }
 
     buf_remove_header(buf, sizeof(udp_hdr_t));
-    // bug: Segmentation Fault, res: map_get() return addr of data, not data
-    // bug: buf in. Function need buf->data to print.
     (*func)((uint8_t *)buf->data, buf->len, src_ip, swap16(hdr->src_port16));
 }
 

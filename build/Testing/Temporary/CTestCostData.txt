@@ -1,7 +1,7 @@
 eth_in 18 0.00153017
 eth_out 17 0.00130744
 arp_test 19 0.00210079
-ip_test 23 0.00172018
-ip_frag_test 21 0.000840429
-icmp_test 8 0.00530344
+ip_test 24 0.0023293
+ip_frag_test 22 0.000901677
+icmp_test 9 0.00494138
 ---
